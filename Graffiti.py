@@ -7,7 +7,7 @@ from CamUtils import get_image, get_cam
 from Colors import *
 
 
-TICK_MS = 50
+TICK_MS = 25
 CLEAR_MS = 100
 BASE_RADIUS = 2
 CANVAS_STRETCH = 3
@@ -40,7 +40,7 @@ def do_graffiti(cam, bounds, mirror=False):
     color = GREEN
     last_dot = None
     clear_cnt = 0
-    
+
     show_image_fullscreen(canvas)
     cv2.waitKey(50)
     
@@ -78,13 +78,17 @@ def do_graffiti(cam, bounds, mirror=False):
             # Cursor size change command
             radius += 1 if k == '[' else -1
             radius = max(1, radius)
+        elif k == 'S':
+            return
 
 
 def main():
-    cam = get_cam()
-    bounds = calibrate_screen_bounds(cam)
+    cam_stream = get_cam()
+    bounds = calibrate_screen_bounds(cam_stream)
 
-    do_graffiti(cam, bounds)
+    do_graffiti(cam_stream, bounds)
+
+    cam_stream.stop()
 
 
 if __name__ == '__main__':

@@ -92,7 +92,7 @@ def find_marker_position(img, last_pos, canvas_stretch_factor):
     thresh = cv2.threshold(blurred, MIN_VISIBLE_THRESH, 255, cv2.THRESH_BINARY)[1]
     _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # # Debug mode: (WARNING: Will trigger epilepsy)
+    # # Debug mode: (WARNING: Will trigger epilepsy. Use at your own risk)
     # from ScreenUtils import show_image_fullscreen
     # show_image_fullscreen(thresh)
     # cv2.waitKey(50)

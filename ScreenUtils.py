@@ -3,7 +3,6 @@ import cv2
 import ctypes
 import numpy as np
 
-
 from CamUtils import get_image
 from ImageUtils import is_square, filter_color_bgr
 from Colors import WHITE, RED
@@ -37,14 +36,17 @@ def show_image_fullscreen(img, mirror=False):
     sw, sh = get_screen_size()
     wf, hf = sw / float(w), sh / float(h)
 
-    # Resize image to screen size
-
-    fs_img = cv2.resize(img, (0, 0), fx=wf, fy=hf)
+    # Resize image to screen size; INTER_NEAREST Seems like the fastest interpolation
+    fs_img = cv2.resize(img, (0, 0), fx=wf, fy=hf, interpolation=cv2.INTER_NEAREST)
 
     cv2.namedWindow("IMG", cv2.WND_PROP_FULLSCREEN)  # Create a named window
     cv2.moveWindow("IMG", 0, 0)  # When displaying on a different monitor, use this offset to push it to there
     cv2.setWindowProperty("IMG", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow("IMG", fs_img)
+
+
+# def show_image_fullscreen(img, mirror=False):
+#     Thread(target=_show_image_fullscreen, args=(img, mirror))
 
 
 def find_corners(img):
