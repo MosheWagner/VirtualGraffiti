@@ -1,7 +1,7 @@
 """Laser Graffiti game.
 
 Example usage with Android camera (using IP camera app):
-$ python Graffiti.py --video_url="http://10.0.0.3:8080/video"
+$ python Graffiti.py --video_url="http://10.0.0.3:8080/video" --canvas_size=500,1000
 """
 
 
@@ -21,9 +21,7 @@ parser = argparse.ArgumentParser(description="Laser Graffiti game")
 
 def int_pair(arg):
     if len(arg.split(",")) != 2:
-        raise argparse.ArgumentError(
-            "Must use a pair of integers seperated with a comma!"
-        )
+        raise argparse.ArgumentError
     return [int(x) for x in arg.split(",")]
 
 
@@ -38,14 +36,14 @@ parser.add_argument(
     "--cemera_id",
     default=None,
     type=str,
-    help="System id of the camera, starting from 0 (when using device's camera)",
+    help="System id of the camera, starting from 0 (set when using device's camera)",
 )
 
 parser.add_argument(
     "--canvas_size",
-    default="500,1000",
+    default="600,1200",
     type=int_pair,
-    help="Requested size of canvas, in tuple form h,w. The exact canvas shape (and thus size) will depend on the detected screen's shape",
+    help="Requested size of canvas, in tuple form h,w. The actual canvas shape (and thus size) will depend on the detected screen's shape",
 )
 
 
@@ -95,14 +93,7 @@ def blank_canvas(canvas_size: Tuple[int, int], channels: int):
     )
 
 
-def do_graffiti(
-    cam,
-    bounds: Tuple[int, int, int, int],
-    rquested_canvas_size: Tuple[int, int],
-    mirror: bool = False,
-):
-    img = get_image(cam, bounds)
-
+def calculate_canvas_size_and_stretch(bounds, rquested_canvas_size):
     bounds_size_y = bounds[3] - bounds[2]
     bounds_size_x = bounds[1] - bounds[0]
     canvas_stretch_factor_h = rquested_canvas_size[0] / bounds_size_y
@@ -111,6 +102,21 @@ def do_graffiti(
     canvas_stretch_factor = (canvas_stretch_factor_w + canvas_stretch_factor_h) / 2
     canvas_size = int(bounds_size_y * canvas_stretch_factor), int(
         bounds_size_x * canvas_stretch_factor
+    )
+
+    return canvas_size, canvas_stretch_factor
+
+
+def do_graffiti(
+    cam,
+    bounds: Tuple[int, int, int, int],
+    rquested_canvas_size: Tuple[int, int],
+    mirror: bool = False,
+):
+    img = get_image(cam, bounds)
+
+    canvas_size, canvas_stretch_factor = calculate_canvas_size_and_stretch(
+        bounds, rquested_canvas_size
     )
     channels = img.shape[2]
 
