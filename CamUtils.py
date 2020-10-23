@@ -1,7 +1,7 @@
 import cv2
 from typing import Optional
 from threading import Thread, Lock
-
+from Shapes import Rectangle
 
 DEF_CAMERA_ID = 0
 ANDROID_VIDEO_URL = "http://10.0.0.2:8080/video"
@@ -11,13 +11,17 @@ def get_cam(video_url: Optional[str] = None, camera_id: Optional[int] = None):
     return WebcamVideoStream(video_url, camera_id).start()
 
 
-def get_image(cam, crop_range=None):
+def get_image(cam, crop_rect: Rectangle = None):
     img = cam.read()
-    if not crop_range:
+    if not crop_rect:
         return img
 
-    # img[y:y+h, x:x+w, :]
-    cropped = img[crop_range[2] : crop_range[3], crop_range[0] : crop_range[1], :]
+    # Slicing requires the format of img[y:y+h, x:x+w, :]
+    cropped = img[
+        crop_rect.bottom_y() : crop_rect.top_y(),
+        crop_rect.left_x() : crop_rect.right_x(),
+        :,
+    ]
 
     return cropped
 

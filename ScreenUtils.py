@@ -2,14 +2,14 @@ import os
 import cv2
 import ctypes
 import numpy as np
-
+from typing import Tuple, Optional
 from CamUtils import get_image
 from ImageUtils import (
-    is_square,
     has_min_size,
     filter_cyan,
 )
 from Colors import *
+from Shapes import Point, Rectangle
 
 SQUARE_COLOR = CYAN
 
@@ -51,7 +51,7 @@ def show_image_fullscreen(img, mirror=False):
     cv2.imshow("IMG", fs_img)
 
 
-def find_corners(filtered_img):
+def find_corners(filtered_img) -> Optional[Tuple[Point, Point]]:
     blurred = cv2.GaussianBlur(filtered_img, (5, 5), 0)
     thresh = cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)[1]
     cnts, _ = cv2.findContours(
@@ -66,7 +66,6 @@ def find_corners(filtered_img):
     show_image_fullscreen(thresh)
     cv2.waitKey(500)
 
-    # cnts = [c for c in cnts if is_square(c, MIN_SCREEN_SIZE)]
     cnts = [c for c in cnts if has_min_size(c, MIN_SCREEN_SIZE)]
 
     if len(cnts) != 1:
@@ -82,19 +81,19 @@ def find_corners(filtered_img):
         tuple(screen_rect[screen_rect[:, :, 0].argmax()][0]),
         tuple(screen_rect[screen_rect[:, :, 0].argmax()][0]),
     )
-    ext_top = min(
+    ext_bottom = min(
         tuple(screen_rect[screen_rect[:, :, 1].argmin()][0]),
         tuple(screen_rect[screen_rect[:, :, 1].argmin()][0]),
     )
-    ext_bottom = max(
+    ext_top = max(
         tuple(screen_rect[screen_rect[:, :, 1].argmax()][0]),
         tuple(screen_rect[screen_rect[:, :, 1].argmax()][0]),
     )
 
-    return (ext_left[0], ext_top[1]), (ext_right[0], ext_bottom[1])
+    return Point(ext_left[0], ext_bottom[1]), Point(ext_right[0], ext_top[1])
 
 
-def calibrate_screen_bounds(cam):
+def calibrate_screen_bounds(cam) -> Optional[Rectangle]:
     img = get_image(cam)
     h, w, _ = img.shape
 
@@ -122,9 +121,4 @@ def calibrate_screen_bounds(cam):
 
     # print ("Corners are at: ", corners)
 
-    x1, y1, x2, y2 = corners[0][0], corners[1][0], corners[0][1], corners[1][1]
-
-    # The edges of the screen are no good, clip them off:
-    # x1, y1, x2, y2 = x1 + 20, y1, x2, y2 - 80
-
-    return x1, y1, x2, y2
+    return Rectangle(*corners)

@@ -9,17 +9,17 @@ import cv2
 import numpy as np
 import argparse
 import datetime
-from typing import Tuple
+from typing import Tuple, Optional, List
 from ImageUtils import find_marker_position, dist_sq
 from ScreenUtils import show_image_fullscreen, calibrate_screen_bounds
 from CamUtils import get_image, get_cam
 from Colors import *
-
+from Shapes import Point, Rectangle
 
 parser = argparse.ArgumentParser(description="Laser Graffiti game")
 
 
-def int_pair(arg):
+def int_pair(arg) -> List[int]:
     if len(arg.split(",")) != 2:
         raise argparse.ArgumentError
     return [int(x) for x in arg.split(",")]
@@ -72,7 +72,7 @@ class GraffitiState:
         self.clear_cnt = 0
 
 
-def get_key_press(wait_ms):
+def get_key_press(wait_ms: int) -> Optional[str]:
     key_code = cv2.waitKey(wait_ms)
     try:
         key = chr(key_code)
@@ -93,23 +93,24 @@ def blank_canvas(canvas_size: Tuple[int, int], channels: int):
     )
 
 
-def calculate_canvas_size_and_stretch(bounds, rquested_canvas_size):
-    bounds_size_y = bounds[3] - bounds[2]
-    bounds_size_x = bounds[1] - bounds[0]
-    canvas_stretch_factor_h = rquested_canvas_size[0] / bounds_size_y
-    canvas_stretch_factor_w = rquested_canvas_size[1] / bounds_size_x
+def calculate_canvas_size_and_stretch(
+    bounds: Rectangle, rquested_canvas_size: Tuple[int, int]
+) -> Tuple[Tuple[int, int], float]:
+    canvas_stretch_factor_h = rquested_canvas_size[0] / bounds.width()
+    canvas_stretch_factor_w = rquested_canvas_size[1] / bounds.height()
 
     canvas_stretch_factor = (canvas_stretch_factor_w + canvas_stretch_factor_h) / 2
-    canvas_size = int(bounds_size_y * canvas_stretch_factor), int(
-        bounds_size_x * canvas_stretch_factor
+    canvas_size = int(bounds.height() * canvas_stretch_factor), int(
+        bounds.width() * canvas_stretch_factor
     )
 
+    print(canvas_size)
     return canvas_size, canvas_stretch_factor
 
 
 def do_graffiti(
     cam,
-    bounds: Tuple[int, int, int, int],
+    bounds: Rectangle,
     rquested_canvas_size: Tuple[int, int],
     mirror: bool = False,
 ):
@@ -142,20 +143,18 @@ def do_graffiti(
                 break
 
         if marker_position:
-            cx, cy = marker_position
-
             if last_dot:
                 # Draw a line from the last position to ours
-                if dist_sq(last_dot, (cx, cy)) < gap_dist * gap_dist:
+                if dist_sq(last_dot, marker_position) < gap_dist * gap_dist:
                     cv2.line(
                         canvas,
-                        last_dot,
-                        (cx, cy),
+                        last_dot.as_tuple(),
+                        marker_position.as_tuple(),
                         color,
                         thickness=radius,
                         lineType=cv2.LINE_AA,
                     )
-            last_dot = (cx, cy)
+            last_dot = marker_position
         else:
             clear_cnt += 1
 
@@ -165,7 +164,7 @@ def do_graffiti(
 
         draw = canvas.copy()
         if marker_position and SHOW_MARKER:
-            cv2.circle(draw, marker_position, 5, BLUE, 2)
+            cv2.circle(draw, marker_position.as_tuple(), 5, BLUE, 2)
 
         show_image_fullscreen(draw, mirror)
 
