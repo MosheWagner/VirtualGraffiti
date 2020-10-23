@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import argparse
 import datetime
-
+from typing import Tuple
 from ImageUtils import find_marker_position, dist_sq
 from ScreenUtils import show_image_fullscreen, calibrate_screen_bounds
 from CamUtils import get_image, get_cam
@@ -17,6 +17,15 @@ from Colors import *
 
 
 parser = argparse.ArgumentParser(description="Laser Graffiti game")
+
+
+def int_pair(arg):
+    if len(arg.split(",")) != 2:
+        raise argparse.ArgumentError(
+            "Must use a pair of integers seperated with a comma!"
+        )
+    return [int(x) for x in arg.split(",")]
+
 
 parser.add_argument(
     "--video_url",
@@ -32,13 +41,18 @@ parser.add_argument(
     help="System id of the camera, starting from 0 (when using device's camera)",
 )
 
+parser.add_argument(
+    "--canvas_size",
+    default="500,1000",
+    type=int_pair,
+    help="Requested size of canvas, in tuple form h,w. The exact canvas shape (and thus size) will depend on the detected screen's shape",
+)
+
 
 TICK_MS = 20
 CLEAR_MS = TICK_MS * 2
 BASE_RADIUS = 2
-# TODO: Use fixed canvas size instead, which will define the STRETCH factor
-CANVAS_STRETCH = 3
-GAP_DIST = TICK_MS * 15 * CANVAS_STRETCH
+GAP_DIST = TICK_MS * 15
 
 MAX_SNAPS_PER_FRAME = 4
 
@@ -70,14 +84,40 @@ def get_key_press(wait_ms):
     return key.upper()
 
 
-def do_graffiti(cam, bounds, mirror=False):
-    img = get_image(cam, bounds)
-
-    state = GraffitiState()
-    canvas = np.zeros(
-        (img.shape[0] * CANVAS_STRETCH, img.shape[1] * CANVAS_STRETCH, img.shape[2]),
+def blank_canvas(canvas_size: Tuple[int, int], channels: int):
+    return np.zeros(
+        (
+            canvas_size[0],
+            canvas_size[1],
+            channels,
+        ),
         np.uint8,
     )
+
+
+def do_graffiti(
+    cam,
+    bounds: Tuple[int, int, int, int],
+    rquested_canvas_size: Tuple[int, int],
+    mirror: bool = False,
+):
+    img = get_image(cam, bounds)
+
+    bounds_size_y = bounds[3] - bounds[2]
+    bounds_size_x = bounds[1] - bounds[0]
+    canvas_stretch_factor_h = rquested_canvas_size[0] / bounds_size_y
+    canvas_stretch_factor_w = rquested_canvas_size[1] / bounds_size_x
+
+    canvas_stretch_factor = (canvas_stretch_factor_w + canvas_stretch_factor_h) / 2
+    canvas_size = int(bounds_size_y * canvas_stretch_factor), int(
+        bounds_size_x * canvas_stretch_factor
+    )
+    channels = img.shape[2]
+
+    gap_dist = GAP_DIST * canvas_stretch_factor
+
+    state = GraffitiState()
+    canvas = blank_canvas(canvas_size, channels)
     radius = BASE_RADIUS
     color = GREEN
     last_dot = None
@@ -91,7 +131,7 @@ def do_graffiti(cam, bounds, mirror=False):
         loop_start = datetime.datetime.now()
         for i in range(MAX_SNAPS_PER_FRAME):
             img = get_image(cam, bounds)
-            marker_position = find_marker_position(img, last_dot, CANVAS_STRETCH)
+            marker_position = find_marker_position(img, last_dot, canvas_stretch_factor)
             if marker_position:
                 break
 
@@ -100,7 +140,7 @@ def do_graffiti(cam, bounds, mirror=False):
 
             if last_dot:
                 # Draw a line from the last position to ours
-                if dist_sq(last_dot, (cx, cy)) < GAP_DIST * GAP_DIST:
+                if dist_sq(last_dot, (cx, cy)) < gap_dist * gap_dist:
                     cv2.line(
                         canvas,
                         last_dot,
@@ -132,14 +172,7 @@ def do_graffiti(cam, bounds, mirror=False):
         if k == "C":
             # Clear command
             last_dot = None
-            canvas = np.zeros(
-                (
-                    img.shape[0] * CANVAS_STRETCH,
-                    img.shape[1] * CANVAS_STRETCH,
-                    img.shape[2],
-                ),
-                np.uint8,
-            )
+            canvas = blank_canvas(canvas_size, channels)
             radius = BASE_RADIUS  # Back to normal size
         if k in color_code_map:
             # Color change command
@@ -157,12 +190,13 @@ def main():
 
     cam_stream = get_cam(video_url=args.video_url, camera_id=args.cemera_id)
     bounds = calibrate_screen_bounds(cam_stream)
+
     if not bounds:
         cam_stream.stop()
         return
 
     try:
-        do_graffiti(cam_stream, bounds)
+        do_graffiti(cam_stream, bounds, args.canvas_size)
     except Exception as e:
         cam_stream.stop()
         raise e

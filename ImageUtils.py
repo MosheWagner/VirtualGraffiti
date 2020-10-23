@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+from typing import Tuple, Optional
 from Colors import *
 
 
@@ -102,14 +102,16 @@ def dist_sq(p1, p2):
     return (p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1])
 
 
-def contour_center(cnt, canvas_stretch_factor):
+def contour_center(cnt, canvas_stretch_factor) -> Tuple[int, int]:
     c, r = cv2.minEnclosingCircle(cnt)
 
     # Our canvas is bigger than the image, adjust for that
-    return int(c[0]) * canvas_stretch_factor, int(c[1]) * canvas_stretch_factor
+    return int(c[0] * canvas_stretch_factor), int(c[1] * canvas_stretch_factor)
 
 
-def find_marker_position(img, last_pos, canvas_stretch_factor):
+def find_marker_position(
+    img, last_pos, canvas_stretch_factor
+) -> Optional[Tuple[int, int]]:
     # filtered = filter_red_hsv(img)
     filtered = filter_red_improved(img)
 

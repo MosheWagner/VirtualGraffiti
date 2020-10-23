@@ -111,7 +111,6 @@ def calibrate_screen_bounds(cam):
         cv2.waitKey(1000)
 
         img = get_image(cam)
-        # filtered = filter_color_bgr(img, SQUARE_COLOR)
         filtered = filter_cyan(img)
 
         corners = find_corners(filtered)
@@ -122,9 +121,6 @@ def calibrate_screen_bounds(cam):
     else:
         print("Failed to find screen corners!")
         return None
-
-    # cv2.rectangle(img, corners[0], (corners[0][0] + 10, corners[0][1] + 10), RED, cv2.FILLED)
-    # cv2.rectangle(img, corners[1], (corners[1][0] - 10, corners[1][1] - 10), RED, cv2.FILLED)
 
     # print ("Corners are at: ", corners)
 
