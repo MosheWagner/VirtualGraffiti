@@ -16,9 +16,10 @@ def get_image(cam, crop_range=None):
         return img
 
     # img[y:y+h, x:x+w, :]
-    cropped = img[crop_range[2]:crop_range[3], crop_range[0]:crop_range[1], :]
+    cropped = img[crop_range[2] : crop_range[3], crop_range[0] : crop_range[1], :]
 
     return cropped
+
 
 # Based on https://gist.github.com/allskyee/7749b9318e914ca45eb0a1000a81bf56
 class WebcamVideoStream:

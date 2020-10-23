@@ -29,7 +29,10 @@ def _create_hue_mask(image, lower_hue, upper_hue):
 
 def create_hue_masks(image, lower_hue, upper_hue):
     if upper_hue < lower_hue:  # This means we have a wrap around!
-        return [_create_hue_mask(image, lower_hue, 179), _create_hue_mask(image, 0, upper_hue)]
+        return [
+            _create_hue_mask(image, lower_hue, 179),
+            _create_hue_mask(image, 0, upper_hue),
+        ]
 
     return [_create_hue_mask(image, lower_hue, upper_hue)]
 
@@ -40,7 +43,7 @@ def filter_color_hsv(img, hue_lower, hue_upper):
     hue_masks = create_hue_masks(hsv_image, hue_lower, hue_upper)
 
     if len(hue_masks) > 1:
-        masked = cv2.addWeighted(hue_masks[0], 0.5, hue_masks[1],  0.5, 0.0)
+        masked = cv2.addWeighted(hue_masks[0], 0.5, hue_masks[1], 0.5, 0.0)
     else:
         masked = hue_masks[0]
     grey = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
@@ -57,7 +60,7 @@ def filter_cyan(img):
 
 def filter_red_improved(img):
     return filter_cyan(cv2.bitwise_not(img))
-    
+
 
 def is_close(n1, n2, thresh=0.05, min_diff=1):
     if abs(n1 - n2) < min_diff:
@@ -83,7 +86,8 @@ def is_square(c, min_corner_size):
         return False
 
     return True
-    
+
+
 def has_min_size(c, min_size):
     peri = cv2.arcLength(c, True)
     approx = cv2.approxPolyDP(c, 0.04 * peri, True)
@@ -95,7 +99,7 @@ def has_min_size(c, min_size):
 
 
 def dist_sq(p1, p2):
-    return (p1[0]-p2[0])*(p1[0]-p2[0]) + (p1[1]-p2[1])*(p1[1]-p2[1])
+    return (p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1])
 
 
 def contour_center(cnt, canvas_stretch_factor):
@@ -106,12 +110,14 @@ def contour_center(cnt, canvas_stretch_factor):
 
 
 def find_marker_position(img, last_pos, canvas_stretch_factor):
-    #filtered = filter_red_hsv(img)
+    # filtered = filter_red_hsv(img)
     filtered = filter_red_improved(img)
 
     blurred = cv2.GaussianBlur(filtered, (7, 7), 2, 2)
     thresh = cv2.threshold(blurred, MIN_VISIBLE_THRESH, 255, cv2.THRESH_BINARY)[1]
-    cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2:]
+    cnts, _ = cv2.findContours(
+        thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )[-2:]
 
     # # Debug mode: (WARNING: Will trigger epilepsy. Use at your own risk)
     # from ScreenUtils import show_image_fullscreen
