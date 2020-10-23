@@ -4,19 +4,6 @@ from typing import Tuple, Optional
 from Colors import *
 
 
-def filter_color_bgr(img, color, thresh):
-    # create NumPy arrays from the boundaries
-    lower = np.array([max(0, c - thresh) for c in color], dtype="uint8")
-    upper = np.array([min(255, c + thresh) for c in color], dtype="uint8")
-
-    # find the colors within the specified boundaries and apply the mask
-    mask = cv2.inRange(img, lower, upper)
-    output = cv2.bitwise_and(img, img, mask=mask)
-    gray = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
-
-    return gray
-
-
 def _create_hue_mask(image, lower_hue, upper_hue):
     lower = np.array([lower_hue, MIN_SATURATION, MIN_VALUE], np.uint8)
     upper = np.array([upper_hue, 255, 255], np.uint8)
@@ -50,15 +37,11 @@ def filter_color_hsv(img, hue_lower, hue_upper):
     return grey
 
 
-def filter_red_hsv(img):
-    return filter_color_hsv(img, RED_LOWER_HUE, RED_UPPER_HUE)
-
-
 def filter_cyan(img):
     return filter_color_hsv(img, CYAN_LOWER_HUE, CYAN_UPPER_HUE)
 
 
-def filter_red_improved(img):
+def filter_red_hsv_inverse(img):
     return filter_cyan(cv2.bitwise_not(img))
 
 
@@ -112,8 +95,7 @@ def contour_center(cnt, canvas_stretch_factor) -> Tuple[int, int]:
 def find_marker_position(
     img, last_pos, canvas_stretch_factor
 ) -> Optional[Tuple[int, int]]:
-    # filtered = filter_red_hsv(img)
-    filtered = filter_red_improved(img)
+    filtered = filter_red_hsv_inverse(img)
 
     blurred = cv2.GaussianBlur(filtered, (7, 7), 2, 2)
     thresh = cv2.threshold(blurred, MIN_VISIBLE_THRESH, 255, cv2.THRESH_BINARY)[1]

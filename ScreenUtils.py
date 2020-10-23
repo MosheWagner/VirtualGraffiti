@@ -6,8 +6,6 @@ import numpy as np
 from CamUtils import get_image
 from ImageUtils import (
     is_square,
-    filter_color_bgr,
-    filter_red_hsv,
     has_min_size,
     filter_cyan,
 )
