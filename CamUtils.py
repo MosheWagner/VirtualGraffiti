@@ -3,10 +3,11 @@ from threading import Thread, Lock
 
 
 DEF_CAMERA_ID = 0
+ANDROID_VIDEO_URL = "http://10.0.0.2:8080/video"
 
 
-def get_cam():
-    return WebcamVideoStream().start()
+def get_cam(video_url=None, camera_id=None):
+    return WebcamVideoStream(video_url, camera_id).start()
 
 
 def get_image(cam, crop_range=None):
@@ -21,8 +22,8 @@ def get_image(cam, crop_range=None):
 
 # Based on https://gist.github.com/allskyee/7749b9318e914ca45eb0a1000a81bf56
 class WebcamVideoStream:
-    def __init__(self):
-        self.stream = cv2.VideoCapture(DEF_CAMERA_ID)
+    def __init__(self, video_url, camera_id):
+        self.stream = cv2.VideoCapture(video_url or camera_id)
 
         self.grabbed, self.frame = self.stream.read()
         self.started = False
@@ -31,7 +32,7 @@ class WebcamVideoStream:
 
     def start(self):
         if self.started:
-            print "Already started!!"
+            # This can only be started once
             return None
         self.started = True
         self.thread = Thread(target=self.update, args=())
@@ -40,7 +41,7 @@ class WebcamVideoStream:
 
     def update(self):
         while self.started:
-            (grabbed, frame) = self.stream.read()
+            grabbed, frame = self.stream.read()
             self.read_lock.acquire()
             self.grabbed, self.frame = grabbed, frame
             self.read_lock.release()
@@ -53,7 +54,8 @@ class WebcamVideoStream:
 
     def stop(self):
         self.started = False
-        self.thread.join()
+        if self.thread.is_alive():
+            self.thread.join()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stream.release()

@@ -4,11 +4,12 @@ import ctypes
 import numpy as np
 
 from CamUtils import get_image
-from ImageUtils import is_square, filter_color_bgr
-from Colors import WHITE, RED
+from ImageUtils import is_square, filter_color_bgr, filter_red_hsv, has_min_size, filter_cyan
+from Colors import *
 
+SQUARE_COLOR = CYAN
 
-MIN_SCREEN_CORNER_SIZE = 100
+MIN_SCREEN_SIZE = 8000
 
 gScreenSize = None
 
@@ -21,7 +22,6 @@ def get_screen_size():
 
         user32 = ctypes.windll.user32
         # TODO: If you are using 2 screens, make sure this returns the correct value
-
         gScreenSize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 
     return gScreenSize[0], gScreenSize[1]
@@ -45,35 +45,31 @@ def show_image_fullscreen(img, mirror=False):
     cv2.imshow("IMG", fs_img)
 
 
-# def show_image_fullscreen(img, mirror=False):
-#     Thread(target=_show_image_fullscreen, args=(img, mirror))
-
-
-def find_corners(img):
-    # Filter our all but white
-    filtered = filter_color_bgr(img, WHITE)
-
-    blurred = cv2.GaussianBlur(filtered, (5, 5), 0)
-    thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
-    _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+def find_corners(filtered_img):
+    blurred = cv2.GaussianBlur(filtered_img, (5, 5), 0)
+    thresh = cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)[1]
+    cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2:]
 
     for c in cnts:
         x, y, w, h = cv2.boundingRect(c)
         # draw a rectangle to visualize the bounding rect
-        cv2.rectangle(img, (x, y), (x + w, y + h), RED, 2)
+        cv2.rectangle(thresh, (x, y), (x + w, y + h), RED, 2)
 
-    show_image_fullscreen(img)
+    show_image_fullscreen(thresh)
     cv2.waitKey(500)
 
-    cnts = [c for c in cnts if is_square(c, MIN_SCREEN_CORNER_SIZE)]
+    # cnts = [c for c in cnts if is_square(c, MIN_SCREEN_SIZE)]
+    cnts = [c for c in cnts if has_min_size(c, MIN_SCREEN_SIZE)]
 
-    if len(cnts) != 2:
+    if len(cnts) != 1:
         return None
+        
+    screen_rect = cnts[0]
 
-    ext_left = min(tuple(cnts[0][cnts[0][:, :, 0].argmin()][0]), tuple(cnts[1][cnts[1][:, :, 0].argmin()][0]))
-    ext_right = max(tuple(cnts[0][cnts[0][:, :, 0].argmax()][0]), tuple(cnts[1][cnts[1][:, :, 0].argmax()][0]))
-    ext_top = min(tuple(cnts[0][cnts[0][:, :, 1].argmin()][0]), tuple(cnts[1][cnts[1][:, :, 1].argmin()][0]))
-    ext_bottom = max(tuple(cnts[0][cnts[0][:, :, 1].argmax()][0]), tuple(cnts[1][cnts[1][:, :, 1].argmax()][0]))
+    ext_left = min(tuple(screen_rect[screen_rect[:, :, 0].argmin()][0]), tuple(screen_rect[screen_rect[:, :, 0].argmin()][0]))
+    ext_right = max(tuple(screen_rect[screen_rect[:, :, 0].argmax()][0]), tuple(screen_rect[screen_rect[:, :, 0].argmax()][0]))
+    ext_top = min(tuple(screen_rect[screen_rect[:, :, 1].argmin()][0]), tuple(screen_rect[screen_rect[:, :, 1].argmin()][0]))
+    ext_bottom = max(tuple(screen_rect[screen_rect[:, :, 1].argmax()][0]), tuple(screen_rect[screen_rect[:, :, 1].argmax()][0]))
 
     return (ext_left[0], ext_top[1]), (ext_right[0], ext_bottom[1])
 
@@ -83,26 +79,32 @@ def calibrate_screen_bounds(cam):
     h, w, _ = img.shape
 
     cnvs = np.zeros(img.shape, np.uint8)
-
-    cv2.rectangle(cnvs, (0, 0), (40, 50), WHITE, cv2.FILLED)
-    cv2.rectangle(cnvs, (w, h), (w - 40, h - 50), WHITE, cv2.FILLED)
+    
+    cv2.rectangle(cnvs, (0, 0), (w, h), SQUARE_COLOR, cv2.FILLED)
 
     corners = None
-    while not corners:
+    for i in range(5):
         show_image_fullscreen(cnvs)
 
-        cv2.waitKey(500)
-
-        img = get_image(cam)
-        corners = find_corners(img)
-
-        show_image_fullscreen(img)
         cv2.waitKey(1000)
 
-    cv2.rectangle(img, corners[0], (corners[0][0] + 10, corners[0][1] + 10), RED, cv2.FILLED)
-    cv2.rectangle(img, corners[1], (corners[1][0] - 10, corners[1][1] - 10), RED, cv2.FILLED)
+        img = get_image(cam)
+        # filtered = filter_color_bgr(img, SQUARE_COLOR)
+        filtered = filter_cyan(img)
+        
+        corners = find_corners(filtered)
+        cv2.waitKey(1000)
+        
+        if corners:
+            break
+    else:
+        print ("Failed to find screen corners!")
+        return None
 
-    # print "Corners are at: ", corners
+    # cv2.rectangle(img, corners[0], (corners[0][0] + 10, corners[0][1] + 10), RED, cv2.FILLED)
+    # cv2.rectangle(img, corners[1], (corners[1][0] - 10, corners[1][1] - 10), RED, cv2.FILLED)
+
+    # print ("Corners are at: ", corners)
 
     x1, y1, x2, y2 = corners[0][0], corners[1][0], corners[0][1], corners[1][1]
 
