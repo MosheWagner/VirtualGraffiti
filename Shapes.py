@@ -1,4 +1,4 @@
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, Optional
 
 
 class Point:
@@ -35,3 +35,12 @@ class Rectangle:
 
     def bottom_y(self) -> int:
         return self.bottom_left.y
+
+    def contains(self, p: Optional[Point]):
+        if not p:
+            return False
+        if (
+            self.left_x() < p.x < self.right_x()
+            and self.bottom_y() < p.y < self.top_y()
+        ):
+            return True
