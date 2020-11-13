@@ -2,6 +2,7 @@ import cv2
 from typing import Callable, Optional
 from Shapes import Point, Rectangle
 from Colors import WHITE
+import numpy as np
 
 
 class Button:
@@ -57,17 +58,23 @@ class Button:
             lineType=cv2.LINE_AA,
         )
 
-    def is_pressing(self, marker_pos: Optional[Point]):
+    def is_pressed(self, marker_pos: Optional[Point]):
         return self.position.contains(marker_pos)
 
-    def try_click(self, marker_pos: Optional[Point]):
-        if self.is_pressing(marker_pos):
-            self.callback()
-            return True
-        return False
+    def do_callback(self):
+        self.callback()
 
-    def draw(self, canvas):
-        canvas[
-            self.position.bottom_y() : self.position.top_y(),
-            self.position.left_x() : self.position.right_x(),
-        ] = self.img
+    def draw(self, canvas, marker_pos: Optional[Point]):
+        if marker_pos and self.is_pressed(marker_pos):
+            canvas[
+                self.position.bottom_y() : self.position.top_y(),
+                self.position.left_x() : self.position.right_x(),
+            ] = np.zeros(
+                self.img.shape,
+                np.uint8,
+            )
+        else:
+            canvas[
+                self.position.bottom_y() : self.position.top_y(),
+                self.position.left_x() : self.position.right_x(),
+            ] = self.img

@@ -10,7 +10,7 @@ import numpy as np
 import argparse
 import datetime
 from typing import Tuple, Optional, List, Callable
-from ImageUtils import find_marker_position, dist_sq
+from ImageUtils import find_marker_position, dist_sq, save_img_with_ts
 from ScreenUtils import show_image_fullscreen, calibrate_screen_bounds
 from CamUtils import get_image, get_cam
 from Colors import *
@@ -49,9 +49,10 @@ parser.add_argument(
 
 
 TICK_MS = 20
-CLEAR_MS = TICK_MS * 2
+CLEAR_MS = TICK_MS
 BASE_RADIUS = 2
 GAP_DIST = TICK_MS * 15
+BTN_CLICK_SLEEP = 100
 
 MAX_SNAPS_PER_FRAME = 4
 BUTTON_SIZE = 100
@@ -94,6 +95,7 @@ class GraffitiState:
         self.next_button_x = self.canvas_size[1] - BUTTON_SIZE
         self.next_button_y = 0
         self.add_button(self.clear, "Icons/Clear.png")
+        self.add_button(self.save_img, "Icons/Save.png")
         self.add_button(self.set_quit, "Icons/Exit.png")
 
     def add_button(self, callback: Callable, icon_path: str):
@@ -135,6 +137,9 @@ class GraffitiState:
     def set_quit(self):
         self.quit = True
 
+    def save_img(self):
+        save_img_with_ts(img=self.canvas, out_dir="SavedImages")
+
 
 def get_key_press(wait_ms: int) -> Optional[str]:
     key_code = cv2.waitKey(wait_ms)
@@ -168,7 +173,6 @@ def calculate_canvas_size_and_stretch(
         bounds.width() * canvas_stretch_factor
     )
 
-    print(canvas_size)
     return canvas_size, canvas_stretch_factor
 
 
@@ -234,8 +238,11 @@ def game_loop(
             if marker_position:
                 break
 
+        clicked = None
         for btn in state.buttons:
-            btn.try_click(marker_position)
+            if btn.is_pressed(marker_position):
+                clicked = btn
+                btn.do_callback()
 
         if state.quit:
             return
@@ -247,7 +254,7 @@ def game_loop(
             cv2.circle(draw, marker_position.as_tuple(), 5, BLUE, 2)
 
         for bnt in state.buttons:
-            bnt.draw(draw)
+            bnt.draw(draw, marker_position)
 
         show_image_fullscreen(draw, mirror)
 
@@ -255,6 +262,8 @@ def game_loop(
         delta = loop_end - loop_start
         delta_ms = int(delta.total_seconds() * 1000)
         sleep_millis = max(5, TICK_MS - delta_ms)
+        if clicked:
+            sleep_millis = BTN_CLICK_SLEEP
 
         k = get_key_press(sleep_millis)
 

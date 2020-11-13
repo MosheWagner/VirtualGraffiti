@@ -3,6 +3,7 @@ import numpy as np
 from typing import Tuple, Optional
 from Colors import *
 from Shapes import Point
+import time
 
 
 def _create_hue_mask(img, lower_hue: int, upper_hue: int):
@@ -95,3 +96,10 @@ def find_marker_position(
 
     # If we have a few findings, filter to the one closest to the last dot
     return min(points, key=lambda x: dist_sq(x, last_pos_point))
+
+
+def save_img_with_ts(img, out_dir: str):
+    save_timestamp = time.time()
+    outpath = f"{out_dir}/{save_timestamp}.png"
+    cv2.imwrite(outpath, img)
+    print(f"Image saved to {outpath}")
