@@ -7,7 +7,7 @@ But for much, much more modest setups :-)
 
 In short, you can use any red laser pointer to paint graffiti on your screen. It even has on screen buttons that work!
 
-![Demo video](gif/demo.gif)
+![Demo video](gif/Demo.gif)
 
 ## Requirements:
 
