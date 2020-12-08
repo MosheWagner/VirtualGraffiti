@@ -1,30 +1,45 @@
 """Laser Graffiti game.
 
 Example usage with Android camera (using IP camera app):
-$ python Graffiti.py --video_url="http://10.0.0.3:8080/video" --canvas_size=500,1000
+$ python Graffiti.py --video_url="http://10.0.0.3:8080/video"
 """
 
 
 import cv2
 import numpy as np
+import time
 import argparse
 import datetime
 from typing import Tuple, Optional, List, Callable
-from ImageUtils import find_marker_position, dist_sq, save_img_with_ts
-from ScreenUtils import show_image_fullscreen, calibrate_screen_bounds
-from CamUtils import get_image, get_cam
+from ImageUtils import find_marker_position_t, dist_sq, save_img_with_ts
+from ScreenUtils import (
+    show_image_fullscreen,
+    calibrate_screen_bounds,
+    get_screen_size,
+    init_display_window,
+)
+from CamUtils import get_cam
 from Colors import *
 from Shapes import Point, Rectangle
 from Buttons import Button
+from FPSMonitor import FPSMonitor
+from Timestamper import Timestamper
+from multiprocessing import Pool
+
+# Performance TODOs:
+
+# FPS issues:
+# 1. Marker finding (15ms, done in multiple processes).
+# 2. Image show ("waitKey", 10-20ms)
+
+# Latency:
+# 1. Camera latency (??)
+# 2. Camera image crop and copy (40ms!)
+# 3. Marker finding (15ms)
+# 4. Image show ("waitKey", 40ms)
+
 
 parser = argparse.ArgumentParser(description="Laser Graffiti game")
-
-
-def int_pair(arg) -> List[int]:
-    if len(arg.split(",")) != 2:
-        raise argparse.ArgumentError
-    return [int(x) for x in arg.split(",")]
-
 
 parser.add_argument(
     "--video_url",
@@ -36,28 +51,26 @@ parser.add_argument(
 parser.add_argument(
     "--cemera_id",
     default=None,
-    type=str,
+    type=int,
     help="System id of the camera, starting from 0 (set when using device's camera)",
 )
 
 parser.add_argument(
-    "--canvas_size",
-    default="600,1200",
-    type=int_pair,
-    help="Requested size of canvas, in tuple form h,w. The actual canvas shape (and thus size) will depend on the detected screen's shape",
+    "--perf_prints",
+    default=False,
+    type=bool,
+    help="Enable performance debug prints",
 )
 
-
-TICK_MS = 20
+# TODO: All these consts are horrible, and mostly don't do what they should...
+TICK_MS = 5
 CLEAR_MS = TICK_MS
 BASE_RADIUS = 2
 GAP_DIST = TICK_MS * 15
 BTN_CLICK_SLEEP = 100
 
 MAX_SNAPS_PER_FRAME = 4
-BUTTON_SIZE = 100
-
-SHOW_MARKER = True
+BUTTON_SCREEN_FRACTION = 0.07
 
 color_code_map = {
     "W": WHITE,
@@ -92,25 +105,29 @@ class GraffitiState:
         self.quit = False
         self.clear()
         self.buttons = []
-        self.next_button_x = self.canvas_size[1] - BUTTON_SIZE
+        button_size = int(canvas_size[1] * BUTTON_SCREEN_FRACTION)
+        self.next_button_x = self.canvas_size[1] - button_size
         self.next_button_y = 0
-        self.add_button(self.clear, "Icons/Clear.png")
-        self.add_button(self.save_img, "Icons/Save.png")
-        self.add_button(self.set_quit, "Icons/Exit.png")
+        self.add_button(self.clear, "Icons/Clear.png", button_size)
+        self.next_button_y += button_size
+        self.add_button(self.save_img, "Icons/Save.png", button_size)
+        # Put the exit button as low down as possible
+        self.next_button_y = self.canvas_size[0] - button_size - 10
+        self.add_button(self.set_quit, "Icons/Exit.png", button_size)
 
-    def add_button(self, callback: Callable, icon_path: str):
+    def add_button(self, callback: Callable, icon_path: str, button_size: int):
         button = Button(
             callback,
             Rectangle(
                 Point(self.next_button_x, self.next_button_y),
                 Point(
-                    self.next_button_x + BUTTON_SIZE, self.next_button_y + BUTTON_SIZE
+                    self.next_button_x + button_size, self.next_button_y + button_size
                 ),
             ),
             icon_path,
         )
         self.buttons.append(button)
-        self.next_button_y += int(BUTTON_SIZE * 1.5)
+        self.next_button_y += int(button_size * 1.5)
 
     def clear_canvas(self):
         self.canvas = gen_blank_canvas(self.canvas_size, self.img_channels)
@@ -143,6 +160,9 @@ class GraffitiState:
 
 def get_key_press(wait_ms: int) -> Optional[str]:
     key_code = cv2.waitKey(wait_ms)
+    if key_code < 0:
+        return None
+
     try:
         key = chr(key_code)
     except ValueError:
@@ -181,8 +201,9 @@ def do_graffiti(
     bounds: Rectangle,
     rquested_canvas_size: Tuple[int, int],
     mirror: bool = False,
+    enable_perf_prints: bool = False,
 ):
-    img = get_image(cam, bounds)
+    img = cam.read()
 
     canvas_size, canvas_stretch_factor = calculate_canvas_size_and_stretch(
         bounds, rquested_canvas_size
@@ -191,7 +212,7 @@ def do_graffiti(
 
     state = GraffitiState(canvas_size, img_channels, canvas_stretch_factor)
 
-    game_loop(cam, bounds, mirror, state)
+    game_loop(cam, state, mirror, enable_perf_prints)
 
 
 def draw_graffiti(state: GraffitiState, marker_position: Optional[Point]):
@@ -218,25 +239,37 @@ def draw_graffiti(state: GraffitiState, marker_position: Optional[Point]):
 
 def game_loop(
     cam,
-    bounds: Rectangle,
-    mirror: bool,
     state: GraffitiState,
+    mirror: bool,
+    enable_perf_prints: bool,
 ):
     # Clear screen
     show_image_fullscreen(state.canvas)
     cv2.waitKey(50)
 
+    process_pool = Pool()
+    timestamper = Timestamper(printing_enabled=enable_perf_prints)
+    fps_monitor = FPSMonitor(
+        "Main loop fps monitor", printing_enabled=enable_perf_prints
+    )
+
     while True:
+        fps_monitor.tick()
         loop_start = datetime.datetime.now()
 
-        # Find marker position
-        for i in range(MAX_SNAPS_PER_FRAME):
-            img = get_image(cam, bounds)
-            marker_position = find_marker_position(
-                img, state.last_dot, state.canvas_stretch_factor
-            )
-            if marker_position:
-                break
+        timestamper.stamp_start("Image reading")
+        params = [
+            (cam.read(), state.last_dot, state.canvas_stretch_factor)
+            for _ in range(MAX_SNAPS_PER_FRAME)
+        ]
+
+        timestamper.stamp_start("Marker finding")
+        maybe_positions = process_pool.map(find_marker_position_t, params)
+        marker_position = next(
+            (pos for pos in maybe_positions if pos is not None), None
+        )
+
+        timestamper.stamp_start("Buttons")
 
         clicked = None
         for btn in state.buttons:
@@ -247,24 +280,34 @@ def game_loop(
         if state.quit:
             return
 
+        timestamper.stamp_start("Drawing")
+
         draw_graffiti(state, marker_position)
 
-        draw = state.canvas.copy()
-        if marker_position and SHOW_MARKER:
-            cv2.circle(draw, marker_position.as_tuple(), 5, BLUE, 2)
+        # Ideally we would want to copy the canvas here, but this takes unberablly long (~15ms on my laptop).
+        # We avoid that and simply re-draw the buttons again and again on the original canvas.
+        draw = state.canvas
 
         for bnt in state.buttons:
             bnt.draw(draw, marker_position)
 
+        timestamper.stamp_start("Display")
+
         show_image_fullscreen(draw, mirror)
+
+        timestamper.stamp_start("Sleep")
 
         loop_end = datetime.datetime.now()
         delta = loop_end - loop_start
         delta_ms = int(delta.total_seconds() * 1000)
-        sleep_millis = max(5, TICK_MS - delta_ms)
+        required_sleep_millis = TICK_MS - delta_ms
+
+        sleep_millis = max(1, required_sleep_millis)
+
         if clicked:
             sleep_millis = BTN_CLICK_SLEEP
 
+        timestamper.stamp_start("Image show")
         k = get_key_press(sleep_millis)
 
         # Keyboard meta commands
@@ -286,7 +329,13 @@ def game_loop(
 def main():
     args = parser.parse_args()
 
-    cam_stream = get_cam(video_url=args.video_url, camera_id=args.cemera_id)
+    init_display_window()
+
+    cam_stream = get_cam(
+        video_url=args.video_url,
+        camera_id=args.cemera_id,
+        enable_perf_prints=args.perf_prints,
+    )
     try:
         bounds = calibrate_screen_bounds(cam_stream)
 
@@ -294,7 +343,13 @@ def main():
             cam_stream.stop()
             return
 
-        do_graffiti(cam_stream, bounds, args.canvas_size)
+        cam_stream.update_crop_rect(bounds)
+        do_graffiti(
+            cam=cam_stream,
+            bounds=bounds,
+            rquested_canvas_size=get_screen_size(),
+            enable_perf_prints=args.perf_prints,
+        )
     finally:
         cam_stream.stop()
 

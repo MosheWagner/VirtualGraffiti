@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 from Colors import *
 from Shapes import Point
 import time
@@ -68,6 +68,10 @@ def contour_center(cnt, canvas_stretch_factor) -> Point:
     return Point(int(c[0] * canvas_stretch_factor), int(c[1] * canvas_stretch_factor))
 
 
+def find_marker_position_t(args: Tuple[Any, Optional[Point], float]):
+    return find_marker_position(*args)
+
+
 def find_marker_position(
     img, last_pos: Optional[Point], canvas_stretch_factor: float
 ) -> Optional[Point]:
@@ -79,7 +83,7 @@ def find_marker_position(
         thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )[-2:]
 
-    # # Debug mode: (WARNING: Will trigger epilepsy. Use at your own risk)
+    # # Hyper debug mode: (WARNING: Will trigger epilepsy. Use at your own risk)
     # from ScreenUtils import show_img_fullscreen
     # show_img_fullscreen(thresh)
     # cv2.waitKey(50)

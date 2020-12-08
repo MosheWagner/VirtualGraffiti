@@ -1,65 +1,72 @@
 import cv2
+import time
 from typing import Optional
 from threading import Thread, Lock
 from Shapes import Rectangle
-
-DEF_CAMERA_ID = 0
-ANDROID_VIDEO_URL = "http://10.0.0.2:8080/video"
+from FPSMonitor import FPSMonitor
 
 
-def get_cam(video_url: Optional[str] = None, camera_id: Optional[int] = None):
-    return WebcamVideoStream(video_url, camera_id).start()
-
-
-def get_image(cam, crop_rect: Rectangle = None):
-    img = cam.read()
-    if not crop_rect:
-        return img
-
-    # Slicing requires the format of img[y:y+h, x:x+w, :]
-    cropped = img[
-        crop_rect.bottom_y() : crop_rect.top_y(),
-        crop_rect.left_x() : crop_rect.right_x(),
-        :,
-    ]
-
-    return cropped
+def get_cam(
+    video_url: Optional[str] = None,
+    camera_id: Optional[int] = None,
+    enable_perf_prints: bool = False,
+):
+    return WebcamVideoStream(video_url, camera_id, enable_perf_prints).start()
 
 
 # Based on https://gist.github.com/allskyee/7749b9318e914ca45eb0a1000a81bf56
 class WebcamVideoStream:
-    def __init__(self, video_url: Optional[str], camera_id: Optional[int]):
+    def __init__(
+        self,
+        video_url: Optional[str],
+        camera_id: Optional[int],
+        enable_perf_prints: bool,
+    ):
         self.stream = cv2.VideoCapture(video_url or camera_id)
 
         self.grabbed, self.frame = self.stream.read()
-        self.started = False
+        self.running = False
         self.thread = None
-        self.read_lock = Lock()
+        self.crop_rect: Optional[Rectangle] = None
+        self.lock = Lock()
+        self.fps_monitor = FPSMonitor(
+            "Camera fps monitor", printing_enabled=enable_perf_prints
+        )
+
+    def update_crop_rect(self, crop_rect: Rectangle):
+        self.crop_rect = crop_rect
 
     def start(self):
-        if self.started:
+        if self.running:
             # This can only be started once
             return None
-        self.started = True
+        self.running = True
         self.thread = Thread(target=self.update, args=())
         self.thread.start()
         return self
 
     def update(self):
-        while self.started:
-            grabbed, frame = self.stream.read()
-            self.read_lock.acquire()
-            self.grabbed, self.frame = grabbed, frame
-            self.read_lock.release()
+        while self.running:
+            self.fps_monitor.tick()
+            _, frame = self.stream.read()
+            crop_rect = self.crop_rect
+            if crop_rect:
+                frame = frame[
+                    crop_rect.bottom_y() : crop_rect.top_y(),
+                    crop_rect.left_x() : crop_rect.right_x(),
+                    :,
+                ]
+
+            frame_copy = frame.copy()
+            with self.lock:
+                self.frame = frame_copy
 
     def read(self):
-        self.read_lock.acquire()
-        frame = self.frame.copy()
-        self.read_lock.release()
-        return frame
+        with self.lock:
+            return self.frame
 
     def stop(self):
-        self.started = False
+        self.running = False
         if self.thread.is_alive():
             self.thread.join()
 

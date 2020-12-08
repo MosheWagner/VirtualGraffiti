@@ -5,6 +5,10 @@ from Colors import WHITE
 import numpy as np
 
 
+IMG_FILL_FACTOR = 0.5
+BORDER_WITH = 3
+
+
 class Button:
     # callback: Callable
     position: Rectangle
@@ -18,11 +22,33 @@ class Button:
     ):
         self.callback = callback
         self.position = position
-        self.img = cv2.resize(
+        # Black background
+        self.img = np.zeros(
+            (self.position.width(), self.position.height(), 3),
+            np.uint8,
+        )
+        pic = cv2.resize(
             cv2.imread(image_path),
-            (self.position.width(), self.position.height()),
+            (
+                int(self.position.width() * IMG_FILL_FACTOR),
+                int(self.position.height() * IMG_FILL_FACTOR),
+            ),
             interpolation=cv2.INTER_AREA,
         )
+        full_margin_x = self.position.width() - int(
+            self.position.width() * IMG_FILL_FACTOR
+        )
+        half_margin_x = full_margin_x // 2
+        margin_x_correct = full_margin_x - (half_margin_x * 2)
+        full_margin_y = self.position.height() - int(
+            self.position.height() * IMG_FILL_FACTOR
+        )
+        half_margin_y = full_margin_y // 2
+        margin_y_correct = full_margin_y - (half_margin_y * 2)
+        self.img[
+            half_margin_y + margin_y_correct : self.position.height() - half_margin_y,
+            half_margin_x + margin_x_correct : self.position.width() - half_margin_x,
+        ] = pic
 
         # Draw frame
         cv2.line(
@@ -30,7 +56,7 @@ class Button:
             (0, 0),
             (0, self.position.top_y()),
             frame_color,
-            thickness=2,
+            thickness=BORDER_WITH,
             lineType=cv2.LINE_AA,
         )
         cv2.line(
@@ -38,23 +64,23 @@ class Button:
             (0, 0),
             (self.position.right_x(), 0),
             frame_color,
-            thickness=2,
+            thickness=BORDER_WITH,
             lineType=cv2.LINE_AA,
         )
         cv2.line(
             self.img,
-            (self.position.right_x() - 2, self.position.top_y() - 2),
-            (self.position.right_x() - 2, 2),
+            (self.position.right_x(), self.position.top_y()),
+            (self.position.right_x(), 0),
             frame_color,
-            thickness=2,
+            thickness=BORDER_WITH,
             lineType=cv2.LINE_AA,
         )
         cv2.line(
             self.img,
-            (self.position.right_x() - 2, self.position.top_y() - 2),
-            (2, self.position.top_y() - 2),
+            (self.position.right_x(), self.position.top_y()),
+            (0, self.position.top_y()),
             frame_color,
-            thickness=2,
+            thickness=BORDER_WITH,
             lineType=cv2.LINE_AA,
         )
 

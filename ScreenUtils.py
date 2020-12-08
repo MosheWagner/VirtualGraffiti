@@ -3,7 +3,6 @@ import cv2
 import ctypes
 import numpy as np
 from typing import Tuple, Optional
-from CamUtils import get_image
 from ImageUtils import (
     has_min_size,
     filter_cyan,
@@ -13,22 +12,30 @@ from Shapes import Point, Rectangle
 
 SQUARE_COLOR = CYAN
 
-MIN_SCREEN_SIZE = 8000
+MIN_SCREEN_AREA = 8000
 
 gScreenSize = None
 
 
-def get_screen_size():
+def get_screen_size() -> Tuple[int, int]:
     global gScreenSize
     if gScreenSize is None:
         if os.name != "nt":
             raise Exception("Auto screen size only supported on windows for now!")
 
-        user32 = ctypes.windll.user32
+        user32 = ctypes.windll.user32  # type:ignore
         # TODO: If you are using 2 screens, make sure this returns the correct value
         gScreenSize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 
     return gScreenSize[0], gScreenSize[1]
+
+
+def init_display_window():
+    cv2.namedWindow("IMG", cv2.WND_PROP_FULLSCREEN)  # Create a named window
+    cv2.moveWindow(
+        "IMG", 0, 0
+    )  # When displaying on a different monitor, use this offset to push it to there
+    cv2.setWindowProperty("IMG", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 
 def show_image_fullscreen(img, mirror=False):
@@ -43,11 +50,6 @@ def show_image_fullscreen(img, mirror=False):
     # Resize image to screen size; INTER_NEAREST Seems like the fastest interpolation
     fs_img = cv2.resize(img, (0, 0), fx=wf, fy=hf, interpolation=cv2.INTER_NEAREST)
 
-    cv2.namedWindow("IMG", cv2.WND_PROP_FULLSCREEN)  # Create a named window
-    cv2.moveWindow(
-        "IMG", 0, 0
-    )  # When displaying on a different monitor, use this offset to push it to there
-    cv2.setWindowProperty("IMG", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow("IMG", fs_img)
 
 
@@ -66,7 +68,7 @@ def find_corners(filtered_img) -> Optional[Tuple[Point, Point]]:
     show_image_fullscreen(thresh)
     cv2.waitKey(500)
 
-    cnts = [c for c in cnts if has_min_size(c, MIN_SCREEN_SIZE)]
+    cnts = [c for c in cnts if has_min_size(c, MIN_SCREEN_AREA)]
 
     if len(cnts) != 1:
         return None
@@ -94,7 +96,7 @@ def find_corners(filtered_img) -> Optional[Tuple[Point, Point]]:
 
 
 def calibrate_screen_bounds(cam) -> Optional[Rectangle]:
-    img = get_image(cam)
+    img = cam.read()
     h, w, _ = img.shape
 
     cnvs = np.zeros(img.shape, np.uint8)
@@ -107,7 +109,7 @@ def calibrate_screen_bounds(cam) -> Optional[Rectangle]:
 
         cv2.waitKey(1000)
 
-        img = get_image(cam)
+        img = cam.read()
         filtered = filter_cyan(img)
 
         corners = find_corners(filtered)
