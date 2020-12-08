@@ -7,7 +7,7 @@ But for much, much more modest setups :-)
 
 In short, you can use any red laser pointer to paint graffiti on your screen. It even has on screen buttons that work!
 
-[Demo video](https://gifs.com/gif/laser-graffiti-demo-JyvWrJ)
+![Demo video](https://gifs.com/gif/laser-graffiti-demo-JyvWrJ)
 
 ## Requirements:
 
@@ -26,7 +26,7 @@ Running with an external camera feed (such as an IP camera) is as simple as
 python Graffiti.py --video_url="http://{URL_OF_VIDEO_FEED}/video"
 ```
 
-Where URL_OF_VIDEO_FEED is the url to the video feed (for example, for the IP webcam app I use it typically 'http://10.0.0.2:8080/video').
+Where URL_OF_VIDEO_FEED is the url to the video feed (for example, for the IP webcam app I use it typically http://10.0.0.2:8080/video).
 
 If using a camera device connected to the same computer running the code, you can use
 
