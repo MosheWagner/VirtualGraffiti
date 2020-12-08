@@ -1,5 +1,4 @@
 import cv2
-import time
 from typing import Optional
 from threading import Thread, Lock
 from Shapes import Rectangle
@@ -24,7 +23,7 @@ class WebcamVideoStream:
     ):
         self.stream = cv2.VideoCapture(video_url or camera_id)
 
-        self.grabbed, self.frame = self.stream.read()
+        _, self.frame = self.stream.read()
         self.running = False
         self.thread = None
         self.crop_rect: Optional[Rectangle] = None

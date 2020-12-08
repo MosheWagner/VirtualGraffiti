@@ -1,3 +1,6 @@
+""" Color constants """
+
+
 MIN_SATURATION = 30
 MIN_VALUE = 30
 MIN_VISIBLE_THRESH = 20

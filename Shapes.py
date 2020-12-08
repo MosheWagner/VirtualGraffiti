@@ -36,7 +36,7 @@ class Rectangle:
     def bottom_y(self) -> int:
         return self.bottom_left.y
 
-    def contains(self, p: Optional[Point]):
+    def contains(self, p: Optional[Point]) -> bool:
         if not p:
             return False
         if (
@@ -44,3 +44,4 @@ class Rectangle:
             and self.bottom_y() < p.y < self.top_y()
         ):
             return True
+        return False

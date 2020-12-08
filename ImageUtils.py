@@ -62,7 +62,7 @@ def dist_sq(p1: Point, p2: Point) -> int:
 
 
 def contour_center(cnt, canvas_stretch_factor) -> Point:
-    c, r = cv2.minEnclosingCircle(cnt)
+    c, _ = cv2.minEnclosingCircle(cnt)
 
     # Our canvas is bigger than the img, adjust for that
     return Point(int(c[0] * canvas_stretch_factor), int(c[1] * canvas_stretch_factor))

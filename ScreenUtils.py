@@ -24,7 +24,8 @@ def get_screen_size() -> Tuple[int, int]:
             raise Exception("Auto screen size only supported on windows for now!")
 
         user32 = ctypes.windll.user32  # type:ignore
-        # TODO: If you are using 2 screens, make sure this returns the correct value
+        # TODO: If you are using 2 screens, make sure this returns the correct
+        # value
         gScreenSize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 
     return gScreenSize[0], gScreenSize[1]
@@ -32,9 +33,9 @@ def get_screen_size() -> Tuple[int, int]:
 
 def init_display_window():
     cv2.namedWindow("IMG", cv2.WND_PROP_FULLSCREEN)  # Create a named window
-    cv2.moveWindow(
-        "IMG", 0, 0
-    )  # When displaying on a different monitor, use this offset to push it to there
+    # When displaying on a different monitor, use this offset to push it to
+    # there
+    cv2.moveWindow("IMG", 0, 0)
     cv2.setWindowProperty("IMG", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 
@@ -47,7 +48,8 @@ def show_image_fullscreen(img, mirror=False):
     sw, sh = get_screen_size()
     wf, hf = sw / float(w), sh / float(h)
 
-    # Resize image to screen size; INTER_NEAREST Seems like the fastest interpolation
+    # Resize image to screen size; INTER_NEAREST Seems like the fastest
+    # interpolation
     fs_img = cv2.resize(img, (0, 0), fx=wf, fy=hf, interpolation=cv2.INTER_NEAREST)
 
     cv2.imshow("IMG", fs_img)
@@ -104,7 +106,7 @@ def calibrate_screen_bounds(cam) -> Optional[Rectangle]:
     cv2.rectangle(cnvs, (0, 0), (w, h), SQUARE_COLOR, cv2.FILLED)
 
     corners = None
-    for i in range(5):
+    for _ in range(5):
         show_image_fullscreen(cnvs)
 
         cv2.waitKey(1000)

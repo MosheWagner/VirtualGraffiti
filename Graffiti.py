@@ -7,7 +7,6 @@ $ python Graffiti.py --video_url="http://10.0.0.3:8080/video"
 
 import cv2
 import numpy as np
-import time
 import argparse
 import datetime
 from typing import Tuple, Optional, List, Callable
@@ -284,8 +283,10 @@ def game_loop(
 
         draw_graffiti(state, marker_position)
 
-        # Ideally we would want to copy the canvas here, but this takes unberablly long (~15ms on my laptop).
-        # We avoid that and simply re-draw the buttons again and again on the original canvas.
+        # Ideally we would want to copy the canvas here, but this takes unberablly long
+        # (~15ms on my laptop).
+        # We avoid that and simply re-draw the buttons again and again on the
+        # original canvas.
         draw = state.canvas
 
         for bnt in state.buttons:
@@ -321,7 +322,9 @@ def game_loop(
             state.inc_radius()
         elif k == "]":
             state.dec_radius()
-        elif k == "S" or k == "Q":
+        elif k == "S":
+            state.save_img()
+        elif k == "Q":
             # Quit
             return
 
